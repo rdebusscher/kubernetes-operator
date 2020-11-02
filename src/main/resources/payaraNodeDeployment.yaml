@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payara-node
+  labels:
+    app: node
+  generateName: example-
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: Example
+      name: placeholder
+      uid: placeholder
+spec:
+  replicas: [# th:text="${instances}"/]
+  selector:
+    matchLabels:
+      app: node
+  template:
+    metadata:
+      labels:
+        app: node
+    spec:
+      containers:
+        - name: node
+          image: [# th:text="${payara_image}"/]
+          ports:
+            - containerPort: 28080
+          env:
+            - name: PAYARA_DEPLOYMENT_GROUP
+              value: '[# th:text="${deployment_group}"/]'
+            - name: PAYARA_CONFIG_NAME
+              value: '[# th:text="${deployment_group}"/]'
+            - name: PAYARA_DAS_HOST
+              value: '[# th:text="${das_host}"/]'

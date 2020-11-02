@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payara-domain
+  labels:
+    app: domain
+  generateName: example-
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: Example
+      name: placeholder
+      uid: placeholder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: domain
+  template:
+    metadata:
+      labels:
+        app: domain
+    spec:
+      containers:
+        - name: domain
+          image: [# th:text="${payara_image}"/]
+          ports:
+            - containerPort: 4848

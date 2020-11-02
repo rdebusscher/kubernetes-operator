@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: payara-domain
+  labels:
+    name: payara
+  generateName: example-
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: Example
+      name: placeholder
+      uid: placeholder
+spec:
+  type: NodePort
+  ports:
+    - port: 4848
+      nodePort: 30848
+  selector:
+    name: payara-domain

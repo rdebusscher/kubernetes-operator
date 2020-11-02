@@ -1,0 +1,13 @@
+apiVersion: apiextensions.k8s.io/v1beta1
+kind: CustomResourceDefinition
+metadata:
+  name: domains.payara.fish
+spec:
+  group: payara.fish
+  names:
+    kind: Domain
+    listKind: DomainList
+    plural: domains
+    singular: domain
+  scope: Namespaced
+  version: v1alpha1

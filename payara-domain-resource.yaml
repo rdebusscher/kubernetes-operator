@@ -1,0 +1,11 @@
+apiVersion: payara.fish/v1alpha1
+kind: Domain
+metadata:
+  name: example
+spec:
+  payara-image: payara/server-full:5.2020.4
+  application: test
+  # application will be used for deployment, service and deployment group name
+  instances: 2
+  config-script: test.boot
+  artifact: test.war
