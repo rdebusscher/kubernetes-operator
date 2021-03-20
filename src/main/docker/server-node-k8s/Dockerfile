@@ -1,4 +1,4 @@
-FROM payara/server-node:5.2020.4
+FROM payara/server-node:5.2021.1
 
 ENV PAYARA_DEPLOYMENT_GROUP="dg_app" \
     PAYARA_CONFIG_NAME="dg-config" \

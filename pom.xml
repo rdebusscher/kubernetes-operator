@@ -8,15 +8,15 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-
     <properties>
+
 
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
-        <log4j.version>2.12.1</log4j.version>
-        <kubernetes-client.version>4.6.0</kubernetes-client.version>
+        <kubernetes-client.version>5.1.1</kubernetes-client.version>
         <thymeleaf.version>3.0.10.RELEASE</thymeleaf.version>
+        <logback-version>1.2.3</logback-version>
     </properties>
 
     <dependencies>
@@ -24,6 +24,12 @@
             <groupId>io.fabric8</groupId>
             <artifactId>kubernetes-client</artifactId>
             <version>${kubernetes-client.version}</version>
+        </dependency>
+        <!-- To fix a dependency issue with kubernetes-client -->
+        <dependency>
+            <groupId>com.squareup.okio</groupId>
+            <artifactId>okio</artifactId>
+            <version>1.14.0</version>
         </dependency>
 
         <dependency>
@@ -33,16 +39,13 @@
         </dependency>
 
         <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-slf4j-impl</artifactId>
-            <version>${log4j.version}</version>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>${logback-version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-            <version>${log4j.version}</version>
-        </dependency>
+
     </dependencies>
+
 
     <build>
         <finalName>payara-operator</finalName>

@@ -1,16 +1,14 @@
 package be.rubus.payara.accelerator.k8s.operator;
 
 import be.rubus.payara.accelerator.k8s.operator.resource.PayaraDomainResource;
-import be.rubus.payara.accelerator.k8s.operator.resource.PayaraDomainResourceDoneable;
 import be.rubus.payara.accelerator.k8s.operator.resource.PayaraDomainResourceList;
-import io.fabric8.kubernetes.api.model.DoneableService;
+import io.fabric8.kubernetes.api.model.HasMetadata;
 import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.Service;
 import io.fabric8.kubernetes.api.model.ServiceList;
-import io.fabric8.kubernetes.api.model.apiextensions.CustomResourceDefinition;
+import io.fabric8.kubernetes.api.model.apiextensions.v1.CustomResourceDefinition;
 import io.fabric8.kubernetes.api.model.apps.Deployment;
 import io.fabric8.kubernetes.api.model.apps.DeploymentList;
-import io.fabric8.kubernetes.api.model.apps.DoneableDeployment;
 import io.fabric8.kubernetes.client.*;
 import io.fabric8.kubernetes.client.dsl.*;
 import io.fabric8.kubernetes.internal.KubernetesDeserializer;
@@ -38,7 +36,7 @@ public class PayaraOperatorTest {
     private Map<String, PayaraDomainResource> cache = new ConcurrentHashMap<>();
 
     // Client to access the Custom resource
-    private NonNamespaceOperation<PayaraDomainResource, PayaraDomainResourceList, PayaraDomainResourceDoneable, Resource<PayaraDomainResource, PayaraDomainResourceDoneable>> customResourceClient;
+    private NonNamespaceOperation<PayaraDomainResource, PayaraDomainResourceList, Resource<PayaraDomainResource>> customResourceClient;
 
     private static KubernetesClient client;
     private static PodUtil podUtil;
@@ -50,27 +48,29 @@ public class PayaraOperatorTest {
         Config config = new ConfigBuilder().build();
         client = new DefaultKubernetesClient(config);
 
-        String namespace = findNamespace();
+        String namespace = client.getNamespace();
         LogHelper.log("Running in Namespace " + namespace);
 
         // Register the Custom Resource so that Client will use PayaraDomainResource for the YAML.
-        KubernetesDeserializer.registerCustomKind("payara.fish/v1alpha1", "Domain", PayaraDomainResource.class);
+        KubernetesDeserializer.registerCustomKind(HasMetadata.getApiVersion(PayaraDomainResource.class), "Domain", PayaraDomainResource.class);
 
-        // Get the Custom Resopure, If not registered, our Operator can't work properly so throw an Exception.
+
+        // Get the Custom Resource, If not registered, our Operator can't work properly so throw an Exception.
         CustomResourceDefinition crd = client
-                .customResourceDefinitions()
+                .apiextensions().v1().customResourceDefinitions()
                 .list()
                 .getItems()
                 .stream()
                 .filter(d -> "domains.payara.fish".equals(d.getMetadata().getName()))
                 .findAny()
                 .orElseThrow(
-                        () -> new RuntimeException("Deployment error: Custom resource definition domains.payara.fish not found."));
+                        () -> new RuntimeException("Deployment error: Custom resource definition Domain for payara.fish not found."));
+
 
         // Start the Operator as Deamon thread (since using Watch)
         new PayaraOperatorTest(namespace,
                 client
-                        .customResources(crd, PayaraDomainResource.class, PayaraDomainResourceList.class, PayaraDomainResourceDoneable.class)
+                        .customResources(PayaraDomainResource.class, PayaraDomainResourceList.class)
                         .inNamespace(namespace)
 
         ).performWork();
@@ -78,7 +78,7 @@ public class PayaraOperatorTest {
     }
 
     public PayaraOperatorTest(String namespace,
-                              NonNamespaceOperation<PayaraDomainResource, PayaraDomainResourceList, PayaraDomainResourceDoneable, Resource<PayaraDomainResource, PayaraDomainResourceDoneable>> customResourceClient) {
+                              NonNamespaceOperation<PayaraDomainResource, PayaraDomainResourceList, Resource<PayaraDomainResource>> customResourceClient) {
         this.customResourceClient = customResourceClient;
         this.namespace = namespace;
     }
@@ -139,7 +139,7 @@ public class PayaraOperatorTest {
                 }
 
                 @Override
-                public void onClose(KubernetesClientException cause) {
+                public void onClose(WatcherException cause) {
                     cause.printStackTrace();// FIXME
                     System.exit(-1);
                 }
@@ -219,7 +219,7 @@ public class PayaraOperatorTest {
     private void removeDeploymentNode(PayaraDomainResource payaraDomainResource) {
         Optional<Deployment> deployment = findDeployment(payaraDomainResource, "node");
         if (deployment.isPresent()) {
-            NonNamespaceOperation<Deployment, DeploymentList, DoneableDeployment, RollableScalableResource<Deployment, DoneableDeployment>> deployments = client.apps().deployments().inNamespace(namespace);
+            NonNamespaceOperation<Deployment, DeploymentList, RollableScalableResource<Deployment>> deployments = client.apps().deployments().inNamespace(namespace);
             deployments.delete(deployment.get());
 
             // LogHelper.log("Removed Deployment Node" + deployment.get());  // With all info from K8S
@@ -236,7 +236,7 @@ public class PayaraOperatorTest {
     private void removeDeploymentDomain(PayaraDomainResource payaraDomainResource) {
         Optional<Deployment> deployment = findDeployment(payaraDomainResource, "domain");
         if (deployment.isPresent()) {
-            NonNamespaceOperation<Deployment, DeploymentList, DoneableDeployment, RollableScalableResource<Deployment, DoneableDeployment>> deployments = client.apps().deployments().inNamespace(namespace);
+            NonNamespaceOperation<Deployment, DeploymentList, RollableScalableResource<Deployment>> deployments = client.apps().deployments().inNamespace(namespace);
             deployments.delete(deployment.get());
 
             //LogHelper.log("Removed Domain Deployment " + deployment.get());  // With all info from K8S
@@ -254,7 +254,7 @@ public class PayaraOperatorTest {
         Optional<Service> service = findService(payaraDomainResource);
 
         if (service.isPresent()) {
-            NonNamespaceOperation<Service, ServiceList, DoneableService, ServiceResource<Service, DoneableService>> services = client.services().inNamespace(namespace);
+            NonNamespaceOperation<Service, ServiceList, ServiceResource<Service>> services = client.services().inNamespace(namespace);
             services.delete(service.get());
 
             //LogHelper.log("Removed Service " + service.get());  // With all info from K8S
@@ -313,7 +313,7 @@ public class PayaraOperatorTest {
             // Process the payaraDomainDeployment.yaml file with ThymeLeaf so that it is customized with info from the Custom Resource
             String processed = ThymeleafEngine.getInstance().processFile("/payaraDomainDeployment.yaml", payaraDomainResource.getSpec().asTemplateVariables());
             ByteArrayInputStream inputStream = new ByteArrayInputStream(processed.getBytes());
-            NonNamespaceOperation<Deployment, DeploymentList, DoneableDeployment, RollableScalableResource<Deployment, DoneableDeployment>> deployments = client.apps().deployments().inNamespace(namespace);
+            NonNamespaceOperation<Deployment, DeploymentList, RollableScalableResource<Deployment>> deployments = client.apps().deployments().inNamespace(namespace);
 
             // Load the Deployment into Kubernetes (not executed yet)
             Deployment newDeployment = deployments.load(inputStream).get();
@@ -354,7 +354,7 @@ public class PayaraOperatorTest {
             // Add deployment for the Instances, similar to addNewDeploymentDomain().
             String processed = ThymeleafEngine.getInstance().processFile("/payaraNodeDeployment.yaml", payaraDomainResource.getSpec().asTemplateVariablesForNode(dasIP));
             ByteArrayInputStream inputStream = new ByteArrayInputStream(processed.getBytes());
-            NonNamespaceOperation<Deployment, DeploymentList, DoneableDeployment, RollableScalableResource<Deployment, DoneableDeployment>> deployments = client.apps().deployments().inNamespace(namespace);
+            NonNamespaceOperation<Deployment, DeploymentList, RollableScalableResource<Deployment>> deployments = client.apps().deployments().inNamespace(namespace);
 
             Deployment newDeployment = deployments.load(inputStream).get();
             newDeployment.getMetadata().getOwnerReferences().get(0).setUid("node" + payaraDomainResource.getMetadata().getUid());
@@ -378,7 +378,7 @@ public class PayaraOperatorTest {
             // Process the payaraDomainService.yaml file with ThymeLeaf so that it is customized with info from the Custom Resource
             String processed = ThymeleafEngine.getInstance().processFile("//payaraDomainService.yaml", payaraDomainResource.getSpec().asTemplateVariables());
             ByteArrayInputStream inputStream = new ByteArrayInputStream(processed.getBytes());
-            NonNamespaceOperation<Service, ServiceList, DoneableService, ServiceResource<Service, DoneableService>> services = client.services().inNamespace(namespace);
+            NonNamespaceOperation<Service, ServiceList, ServiceResource<Service>> services = client.services().inNamespace(namespace);
 
             // Load the Service into Kubernetes (not executed yet)
             Service newService = services.load(inputStream).get();
@@ -432,10 +432,6 @@ public class PayaraOperatorTest {
             e.printStackTrace(); // FIXME
         }
         return baos.toString();
-    }
-
-    private static String findNamespace() throws IOException {
-        return new String(Files.readAllBytes(Paths.get("/var/run/secrets/kubernetes.io/serviceaccount/namespace")));
     }
 
 
